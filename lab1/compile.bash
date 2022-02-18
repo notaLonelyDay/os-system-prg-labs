@@ -1,3 +1,4 @@
+#!/bin/env bash
 src=$1
 dst=$2
 
@@ -14,11 +15,11 @@ if [ $# -ne 2 ]; then
 fi
 
 if [ -f $src ]; then
-	gcc $src -o $dst
+	gcc $src -o $dst && ./$dst
 	if [ $? -ne 0 ]; then
 		echo "Error: Compilation failed!">&2
 	else
-		echo "Compilation succeded!"
+		echo " Compilation succeded!"
 	fi
 else
 		echo "Error: File $src didn't exist!" >&2

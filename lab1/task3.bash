@@ -1,3 +1,4 @@
+#!/bin/env bash
 string=$1
 dir=$2
 
@@ -20,4 +21,4 @@ if [ ! -d "$dir" ]; then
 	exit
 fi
 
-grep -r "$dir" -e "$string" -l | xargs ls -al | sort -k 5 -n | awk '{print $5,$9}'   
+grep -r "$dir" -e "$string" -l | xargs ls -al | sort -k 5 -n | awk '{print $5,$9}'

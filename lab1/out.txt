@@ -1,2 +1,4 @@
 args.bash
+compile.bash
 ext.bash
+task3.bash
