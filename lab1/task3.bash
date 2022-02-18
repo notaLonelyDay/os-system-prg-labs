@@ -20,9 +20,4 @@ if [ ! -d "$dir" ]; then
 	exit
 fi
 
-{
-	for file in $(grep -r "$dir" -e "$string" -l)
-	do
-		ls $file -la
-	done 
-} | sort -k 5 -n | awk '{print $5,$9}'
+grep -r "$dir" -e "$string" -l | xargs ls -al | sort -k 5 -n | awk '{print $5,$9}'   
