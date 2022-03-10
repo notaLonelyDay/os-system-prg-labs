@@ -23,4 +23,4 @@ if [ ! -d "$dir" ]; then
 	exit
 fi
 
-find $dir -name "*.$ext" -type f -exec basename {} \; | sort -f -o "$out"
+find $dir -name "*.$ext" -type f  -printf "%f\n" | sort -f -o "$out"
