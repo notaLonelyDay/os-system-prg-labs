@@ -5,7 +5,7 @@
 int main(int argc, char *argv[]) {
 
 	if (argc < 3) {
-		printf("Wrong args\nusage: %s <file_name> <amount_of_output_strings>", argv[0]);
+		fprintf(stderr,"Wrong args\nusage: %s <file_name> <amount_of_output_strings>", argv[0]);
 		return 1;
 	}
 
@@ -14,14 +14,14 @@ int main(int argc, char *argv[]) {
 	char *n_str = argv[2];
 	int n = strtol(n_str, NULL, 10);
 	if (errno!=0) {
-		printf("Last parameter (%s) must be int.", n_str);
+		fprintf(stderr,"Last parameter (%s) must be int.", n_str);
 		return 1;
 	}
 
 	FILE *file = fopen(file_name, "r");
 
 	if (file==NULL) {
-		printf("Error: can't open file %s", argv[1]);
+		fprintf(stderr,"Error: can't open file %s", argv[1]);
 		return 1;
 	}
 
@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
 		putc(symb, stdout);
 	}
 	if (fclose(file)) {
-		printf("File %s can't be written", file_name);
+		fprintf(stderr,"File %s can't be written", file_name);
 		return 1;
 	}
 	return 0;

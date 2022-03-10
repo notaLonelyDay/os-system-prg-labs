@@ -2,7 +2,7 @@
 
 int main(int argc, char *argv[]) {
 	if (argc < 2){
-		printf("bad args\n usage: %s <file_name>", argv[0]);
+		fprintf(stderr,"bad args\n usage: %s <file_name>", argv[0]);
 		return 1;
 	}
 
@@ -11,7 +11,7 @@ int main(int argc, char *argv[]) {
 	FILE* file = fopen(file_name, "w");
 
 	if (file == NULL){
-		printf("File %s can't be created", file_name);
+		fprintf(stderr,"File %s can't be created", file_name);
 		return 1;
 	}
 
@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	if(fclose(file)){
-		printf("File %s can't be written", file_name);
+		fprintf(stderr,"File %s can't be written", file_name);
 		return 1;
 	}
 	return 0;
