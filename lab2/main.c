@@ -17,7 +17,7 @@ int dirLen;
 void loadArgInt(char *name, char *from, ll *to) {
 	*to = strtol(from, NULL, 10);
 	if (errno!=0) {
-		fprintf(stderr, "Parameter (%s) must be int.", name);
+		fprintf(stderr, "Parameter (%s) must be int.\n", name);
 		exit(1);
 	}
 }
@@ -45,9 +45,16 @@ void printFile(const struct stat *st) {
 
 void recMain() {
 	struct stat st;
-	stat(dir, &st);
+	if(stat(dir, &st)){
+		fprintf(stderr, "File/dir (%s) can't be read.\n", dir);
+		return;
+	}
 	if (isDir(&st)) {
 		DIR *dirPtr = opendir(dir);
+		if(!dirPtr){
+			fprintf(stderr, "Can't open directory %s!\n", dir);
+			return;
+		}
 
 		struct dirent *d;
 		while ((d = readdir(dirPtr))) {
@@ -68,7 +75,10 @@ void recMain() {
 			}
 		}
 
-		closedir(dirPtr);
+		if(closedir(dirPtr)){
+			fprintf(stderr, "Can't close directory %s!\n", dir);
+			return;
+		}
 	} else {
 		printFile(&st);
 	}
