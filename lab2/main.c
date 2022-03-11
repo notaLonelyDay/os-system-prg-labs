@@ -1,5 +1,3 @@
-
-
 #include <stdio.h>
 #include <dirent.h>
 #include <stdlib.h>
@@ -13,6 +11,7 @@
 ll from_size, to_size, from_date, to_date;
 char dir[1024];
 int dirLen;
+FILE *outFile;
 
 void loadArgInt(char *name, char *from, ll *to) {
 	*to = strtol(from, NULL, 10);
@@ -41,17 +40,18 @@ void printFile(const struct stat *st) {
 	if (from_size <= st->st_size && st->st_size <= to_size
 			&& from_date <= st->st_ctim.tv_sec && st->st_ctim.tv_sec <= to_date)
 		printf("%s    %ld  %ld\n", dir, st->st_size, st->st_ctim.tv_sec);
+	fprintf(outFile, "%s    %ld  %ld\n", dir, st->st_size, st->st_ctim.tv_sec);
 }
 
 void recMain() {
 	struct stat st;
-	if(stat(dir, &st)){
+	if (stat(dir, &st)) {
 		fprintf(stderr, "File/dir (%s) can't be read.\n", dir);
 		return;
 	}
 	if (isDir(&st)) {
 		DIR *dirPtr = opendir(dir);
-		if(!dirPtr){
+		if (!dirPtr) {
 			fprintf(stderr, "Can't open directory %s!\n", dir);
 			return;
 		}
@@ -75,7 +75,7 @@ void recMain() {
 			}
 		}
 
-		if(closedir(dirPtr)){
+		if (closedir(dirPtr)) {
 			fprintf(stderr, "Can't close directory %s!\n", dir);
 			return;
 		}
@@ -91,6 +91,12 @@ int main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	outFile = fopen(argv[2], "w");
+	if (outFile==NULL) {
+		fprintf(stderr, "File %s can't be created", argv[2]);
+		return 1;
+	}
+
 	loadArgInt("from_size", argv[3], &from_size);
 	loadArgInt("to_size", argv[4], &to_size);
 	loadArgInt("from_date", argv[5], &from_date);
@@ -99,5 +105,10 @@ int main(int argc, char *argv[]) {
 	strcpy(dir, argv[1]);
 	dirLen = strlen(dir);
 	recMain();
+
+	if (fclose(outFile)) {
+		fprintf(stderr, "File %s can't be closed", argv[2]);
+		return 1;
+	}
 	return 0;
 }
