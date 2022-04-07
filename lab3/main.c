@@ -38,6 +38,10 @@ int destLen;
 int N;
 int pCount;
 
+void print_info(int pid, char *src, char *dest, long size) {
+	printf("active_process: %d, pid: %d   src: %s   dest: %s   size: %ld\n", pCount, pid, src, dest, size);
+}
+
 void copyFileRaw(char *srcName, char *destName) {
 	FILE *file_1 = fopen(srcName, "r");
 
@@ -60,6 +64,7 @@ void copyFileRaw(char *srcName, char *destName) {
 
 	struct stat copy_stat;
 	stat(srcName, &copy_stat);
+	print_info(getpid(), srcName, destName, copy_stat.st_size);
 
 	chmod(destName, copy_stat.st_mode);
 
