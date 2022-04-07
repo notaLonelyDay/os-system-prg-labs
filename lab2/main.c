@@ -9,8 +9,8 @@
 #define ll long long
 
 ll from_size, to_size, from_date, to_date;
-char dir[1024];
-int dirLen;
+char src[1024];
+int srcLen;
 FILE *outFile;
 
 void loadArgInt(char *name, char *from, ll *to) {
@@ -36,23 +36,23 @@ int isDir(const struct stat *st) {
 }
 
 void printFile(const struct stat *st) {
-//	printf("%s    %ld  %ld\n", dir, st->st_size, st->st_ctim.tv_sec);
+//	printf("%s    %ld  %ld\n", src, st->st_size, st->st_ctim.tv_sec);
 	if (from_size <= st->st_size && st->st_size <= to_size
 			&& from_date <= st->st_ctim.tv_sec && st->st_ctim.tv_sec <= to_date)
-		printf("%s    %ld  %ld\n", dir, st->st_size, st->st_ctim.tv_sec);
-	fprintf(outFile, "%s    %ld  %ld\n", dir, st->st_size, st->st_ctim.tv_sec);
+		printf("%s    %ld  %ld\n", src, st->st_size, st->st_ctim.tv_sec);
+	fprintf(outFile, "%s    %ld  %ld\n", src, st->st_size, st->st_ctim.tv_sec);
 }
 
 void recMain() {
 	struct stat st;
-	if (stat(dir, &st)) {
-		fprintf(stderr, "File/dir (%s) can't be read.\n", dir);
+	if (stat(src, &st)) {
+		fprintf(stderr, "File/src (%s) can't be read.\n", src);
 		return;
 	}
 	if (isDir(&st)) {
-		DIR *dirPtr = opendir(dir);
+		DIR *dirPtr = opendir(src);
 		if (!dirPtr) {
-			fprintf(stderr, "Can't open directory %s!\n", dir);
+			fprintf(stderr, "Can't open directory %s!\n", src);
 			return;
 		}
 
@@ -62,21 +62,21 @@ void recMain() {
 			int destNameLen = strlen(destName);
 
 			if (isValidNextDest(destName)) {
-				int oldDirLen = dirLen;
+				int oldDirLen = srcLen;
 
-				strcat(dir, "/");
-				strcat(dir, destName);
-				dirLen += 1 + destNameLen;
+				strcat(src, "/");
+				strcat(src, destName);
+				srcLen += 1 + destNameLen;
 
 				recMain();
 
-				dirLen -= 1 + destNameLen;
-				dir[oldDirLen] = '\0';
+				srcLen -= 1 + destNameLen;
+				src[oldDirLen] = '\0';
 			}
 		}
 
 		if (closedir(dirPtr)) {
-			fprintf(stderr, "Can't close directory %s!\n", dir);
+			fprintf(stderr, "Can't close directory %s!\n", src);
 			return;
 		}
 	} else {
@@ -102,8 +102,8 @@ int main(int argc, char *argv[]) {
 	loadArgInt("from_date", argv[5], &from_date);
 	loadArgInt("to_date", argv[6], &to_date);
 
-	strcpy(dir, argv[1]);
-	dirLen = strlen(dir);
+	strcpy(src, argv[1]);
+	srcLen = strlen(src);
 	recMain();
 
 	if (fclose(outFile)) {
