@@ -65,7 +65,8 @@ void createTree(Node *root) {
 	createNode(6, n2, SIGUSR1);
 
 	createNode(7, n3, SIGUSR1);
-	createNode(8, n4, SIGUSR1);
+	Node *n8 = createNode(8, n4, SIGUSR1);
+	n8->cn[0] = n1;
 }
 
 void registerSignalHandler(Node *n) {
@@ -89,7 +90,6 @@ void registerSignalHandler(Node *n) {
 	}
 }
 
-
 pid_t forkProcess(Node *n) {
 	pid_t pid = fork();
 	switch (pid) {
@@ -109,13 +109,16 @@ pid_t forkProcess(Node *n) {
 	}
 }
 
+int created[CHILD_COUNT] = {};
+
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "misc-no-recursion"
 void createProcessTree(Node *root) {
+	created[root->val] = 1;
 	curNode = root;
 	for (int i = 0; i < CHILD_COUNT; ++i) {
 		struct Node *nextNode = curNode->cn[i];
-		if (nextNode!=NULL) {
+		if (nextNode!=NULL && !created[nextNode->val]) {
 			char semName[255] = "/child_register_handler";
 			size_t strlen1 = strlen(semName);
 			semName[strlen1] = '0' + nextNode->val;
@@ -130,7 +133,8 @@ void createProcessTree(Node *root) {
 //				printf("Creating process tree for %d\n", curNode->val);
 				createProcessTree(curNode);
 				sem_post(childRegisterHandler);
-//				printf("Exiting %d\n", curNode->val);
+				printf("Exiting %d\n", curNode->val);
+//				sleep(10000);
 				exit(0);
 			} else {
 				// for parent process
@@ -140,17 +144,17 @@ void createProcessTree(Node *root) {
 				if (nextNode->signal!=-1 && curNode->val==1) {
 //					printf("NexNode %d\n", nextNode->val);
 //					printf("CurNode %d\n", curNode->val);
-					kill(pid, SIGUSR2);
+//					kill(pid, SIGUSR2);
 				}
 				continue;
 			}
 		}
 	}
 
-	// TODO: wait for all child processes chessk
+	// TODO: wait for all child processes check
 //	while (1){};
 	while (wait(NULL)!=-1);
-//	printf("Finished %d\n", curNode->val);
+	printf("Finished %d\n", curNode->val);
 }
 #pragma clang diagnostic pop
 
