@@ -14,5 +14,6 @@ add_executable(l2main lab2/main.c)
 add_executable(l3main lab3/main.c)
 
 add_executable(l4tree lab4/tree.c)
+add_executable(l4common lab4/common.c)
 
 
