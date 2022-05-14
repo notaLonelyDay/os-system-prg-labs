@@ -273,7 +273,6 @@ void createProcessTree(Node *root) {
 		}
 	}
 
-	// TODO: wait for all child processes check
 //	while (1){};
 //	while (wait(NULL)!=-1);
 //	printf("Finished %d\n", curNode->val);
