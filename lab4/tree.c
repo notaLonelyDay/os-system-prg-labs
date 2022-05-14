@@ -246,7 +246,7 @@ void createProcessTree(Node *root) {
 //				printf("Creating process tree for %d\n", curNode->val);
 				createProcessTree(curNode);
 				sem_post(childRegisterHandler);
-				printf("Curnode.val: %d\n", curNode->val);
+//				printf("Curnode.val: %d\n", curNode->val);
 				if (curNode->val==1) {
 					sendToAll(SIGUSR2);
 				}
@@ -259,7 +259,7 @@ void createProcessTree(Node *root) {
 				// for parent process //
 				sem_wait(childRegisterHandler);
 				printf("Process tree for %d created\n", nextNode->val);
-//				sem_destroy(childRegisterHandler);
+				sem_destroy(childRegisterHandler);
 //				if (nextNode->signal!=-1 && curNode->val==1) {
 //					printf("NexNode %d\n", nextNode->val);
 //					printf("CurNode %d\n", curNode->val);
