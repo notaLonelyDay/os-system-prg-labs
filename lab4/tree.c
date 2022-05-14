@@ -30,21 +30,45 @@ Node *curNode = NULL;
 int usr1_count_rec = 0;
 int usr2_count_rec = 0;
 
+long long getTime() {
+	struct timeval tv;
+
+	if (gettimeofday(&tv, NULL)==-1) {
+		perror("Can not get current time");
+		return -1;
+	}
+
+	return tv.tv_sec*1000000 + tv.tv_usec;
+}
+
 void sendToAll(int signal);
 int getPid(int val);
+int getValByPid(int pid) {
+	int val = 0;
+	int curPid = -1;
+	for (int i = 0; i < CHILD_COUNT; ++i) {
+		if (getPid(i)==pid) {
+			return i;
+		}
+	}
+
+};
+void printSignalSent(int fromPid, int fromVal, int toPid, int signal, int toVal) {
+	printf("[%lld]  Signal sent from %d(%d) to %d(%d), signal: %d\n", getTime(), fromPid, fromVal, toPid, toVal, signal);
+}
 void signalHandler(int sig, siginfo_t *siginfo, void *code) {
-	printf("%d(%d) received signal %d from %d\n", getpid(), curNode->val, sig, siginfo->si_pid);
+	printf("[%lld]  %d(%d) received signal %d from %d(%d)\n", getTime(), getpid(), curNode->val, sig, siginfo->si_pid,
+	       getValByPid(siginfo->si_pid));
 
 	if (sig==SIGUSR1) {
 		usr1_count_rec++;
 	} else if (sig==SIGUSR2) {
 		usr2_count_rec++;
 	} else if (sig==SIGTERM) {
-		printf("%d(%d) received SIGTERM\n", getpid(), curNode->val);
 		exit(0);
 	}
-	printf("USR1 count: %d\n", usr1_count_rec);
-	printf("USR2 count: %d\n", usr2_count_rec);
+//	printf("USR1 count: %d\n", usr1_count_rec);
+//	printf("USR2 count: %d\n", usr2_count_rec);
 	if (curNode->val==1 && usr1_count_rec==101) {
 		sendToAll(SIGTERM);
 //		sleep(10000);
@@ -58,23 +82,18 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code) {
 		for (int i = 0; i < CHILD_COUNT; ++i) {
 			if (curNode->cn[i]!=NULL) {
 
-				kill(getPid(curNode->cn[i]->val), SIGUSR1);
+				int toVal = curNode->cn[i]->val;
+				int toPid = getPid(toVal);
+				printSignalSent(getpid(), curNode->val, toPid, SIGUSR1, toVal);
+				kill(toPid, SIGUSR1);
 			}
 		}
 	}
 }
 
-void signalHandlerTerm(int sig, siginfo_t *siginfo, void *code) {
-	printf("%d(%d) received signal %d from %d\n", getpid(), curNode->val, sig, siginfo->si_pid);
-}
-
-void printSignalSent(int fromPid, int fromVal, int toPid, int signal) {
-	printf("Signal sent from %d(%d) to %d, signal: %d\n", fromPid, fromVal, toPid, signal);
-}
-
 void sendToAll(int signal) {
 	__pid_t pgid = getpgid(getpid());
-	printSignalSent(getpid(), curNode->val, (-1)*pgid, signal);
+	printSignalSent(getpid(), curNode->val, (-1)*pgid, signal, -1);
 	if (kill((-1)*pgid, signal))
 		perror("Can't send signal");
 }
