@@ -7,6 +7,8 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <string.h>
@@ -20,21 +22,62 @@ typedef struct Node {
 	int val;
 	struct Node *cn[CHILD_COUNT];
 	int signal; // -1 - no signal
-	int aliveChildCount;
+	int signal2; // -1 - no signal
 	sigset_t *sigset;
 } Node;
 
 Node *curNode = NULL;
+int usr1_count_rec = 0;
+int usr2_count_rec = 0;
 
+void sendUsr2ToAllFromNode1();
+int getPid(int val);
 void signalHandler(int sig, siginfo_t *siginfo, void *code) {
-	printf("Signal %d\n", sig);
+	printf("%d(%d) received signal %d from %d\n", getpid(), curNode->val, sig, siginfo->si_pid);
+
+	if (sig==SIGUSR1) {
+		usr1_count_rec++;
+	} else if (sig==SIGUSR2) {
+		usr2_count_rec++;
+	} else if (sig==SIGTERM) {
+		printf("%d(%d) received SIGTERM\n", getpid(), curNode->val);
+		exit(0);
+	}
+	printf("USR1 count: %d\n", usr1_count_rec);
+	printf("USR2 count: %d\n", usr2_count_rec);
+	if (curNode->val==1 && usr1_count_rec==101) {
+		__pid_t pgid = getpgid(getpid());
+		kill(pgid, SIGTERM);
+		while (wait(NULL)!=-1);
+		exit(0);
+	}
+
+	if (curNode->val==1) {
+		sendUsr2ToAllFromNode1();
+	} else {
+		for (int i = 0; i < CHILD_COUNT; ++i) {
+			if (curNode->cn[i]!=NULL) {
+
+				kill(getPid(curNode->cn[i]->val), SIGUSR1);
+			}
+		}
+	}
 }
 
-Node *createNode(int val, Node *parent, int signal) {
+void printSignalSent(int fromPid, int fromVal, int toPid) {
+	printf("Signal sent from %d(%d) to %d\n", fromPid, fromVal, toPid);
+}
+
+void sendUsr2ToAllFromNode1() {
+	__pid_t pgid = getpgid(getpid());
+	printSignalSent(getpid(), curNode->val, (-1)*pgid);
+	kill((-1)*pgid, SIGUSR2);
+}
+
+Node *createNode(int val, Node *parent, int signal, int signal2) {
 	Node *n = (Node *)malloc(sizeof(Node));
 	n->signal = signal;
 	n->val = val;
-	n->aliveChildCount = 0;
 	n->sigset = (sigset_t *)malloc(sizeof(sigset_t));
 	for (int i = 0; i < CHILD_COUNT; ++i) {
 		n->cn[i] = NULL;
@@ -55,28 +98,58 @@ Node *createNode(int val, Node *parent, int signal) {
 	return n;
 }
 
+void savePid(int val, int pid) {
+	key_t key = ftok("shmfile", 65);
+	int shmid = shmget(key, 1024, 0666 | IPC_CREAT);
+	int *str = (int *)shmat(shmid, (void *)0, 0);
+
+	str[val] = pid;
+
+	shmdt(str);
+}
+
+int getPid(int val) {
+	key_t key = ftok("shmfile", 65);
+	int shmid = shmget(key, 1024, 0666 | IPC_CREAT);
+	int *str = (int *)shmat(shmid, (void *)0, 0);
+
+	int ret = str[val];
+
+	shmdt(str);
+	return ret;
+}
+
 void createTree(Node *root) {
-	Node *n1 = createNode(1, root, -1);
-	Node *n2 = createNode(2, n1, SIGUSR2);
-	Node *n3 = createNode(3, n1, SIGUSR2);
-	Node *n4 = createNode(4, n1, SIGUSR2);
-	createNode(5, n1, SIGUSR2);
+	Node *n1 = createNode(1, root, SIGUSR1, 0);
+	Node *n2 = createNode(2, n1, SIGUSR2, SIGTERM);
+	Node *n3 = createNode(3, n1, SIGUSR2, SIGTERM);
+	Node *n4 = createNode(4, n1, SIGUSR2, SIGTERM);
+	createNode(5, n1, SIGUSR2, SIGTERM);
 
-	createNode(6, n2, SIGUSR1);
+	createNode(6, n2, SIGUSR1, SIGTERM);
 
-	createNode(7, n3, SIGUSR1);
-	Node *n8 = createNode(8, n4, SIGUSR1);
+	createNode(7, n3, SIGUSR1, SIGTERM);
+	Node *n8 = createNode(8, n4, SIGUSR1, SIGTERM);
 	n8->cn[0] = n1;
 }
 
 void registerSignalHandler(Node *n) {
 	if (n->signal==-1) return;
 
-	if (sigemptyset(n->sigset) ||
-			sigaddset(n->sigset, n->signal)) {
-		perror("Error: adding signal handler to set");
+	if (sigfillset(n->sigset)) {
+		perror("Error: filling set");
 	}
-	if (sigprocmask(SIG_UNBLOCK, n->sigset, NULL) < 0) {
+	if (n->signal!=0) {
+		if (sigdelset(n->sigset, n->signal)) {
+			perror("Error: deleting set");
+		}
+	}
+	if (n->signal2!=0) {
+		if (sigdelset(n->sigset, n->signal2)) {
+			perror("Error: deleting set");
+		}
+	}
+	if (sigprocmask(SIG_SETMASK, n->sigset, NULL) < 0) {
 		perror("Error: setting signal mask");
 	}
 
@@ -99,12 +172,12 @@ pid_t forkProcess(Node *n) {
 			// for child process
 			printf("Forked process %d(%d) from %d(%d)\n", getpid(), n->val, getppid(), curNode->val);
 			curNode = n;
+			savePid(curNode->val, getpid());
 			registerSignalHandler(curNode);
 
 			return 0;
 		default:
 			// for parent process
-			n->aliveChildCount++;
 			return pid;
 	}
 }
@@ -118,6 +191,7 @@ void createProcessTree(Node *root) {
 	curNode = root;
 	for (int i = 0; i < CHILD_COUNT; ++i) {
 		struct Node *nextNode = curNode->cn[i];
+//		printf("In cycle %d\n", nextNode->val);
 		if (nextNode!=NULL && !created[nextNode->val]) {
 			char semName[255] = "/child_register_handler";
 			size_t strlen1 = strlen(semName);
@@ -125,27 +199,37 @@ void createProcessTree(Node *root) {
 			semName[strlen1 + 1] = '\0';
 //			printf("semName: %s\n", semName);
 			sem_t *childRegisterHandler = sem_open(semName, O_CREAT, 0777, 0);
+
 //			sem_init(childRegisterHandler, 1, 0);
 			pid_t pid = forkProcess(nextNode);
 //			printf("Creating process tree for %d\n", curNode->val);
 			if (pid==0) {
-				// for child process
+				// for child process //
 //				printf("Creating process tree for %d\n", curNode->val);
 				createProcessTree(curNode);
 				sem_post(childRegisterHandler);
+				printf("Curnode.val: %d\n", curNode->val);
+				if (curNode->val==1) {
+					sendUsr2ToAllFromNode1();
+				}
+				while (1) { sleep(20000); }
+//				while (1){};
+//				sleep(20000);
 				printf("Exiting %d\n", curNode->val);
-//				sleep(10000);
 				exit(0);
 			} else {
-				// for parent process
+				// for parent process //
 				sem_wait(childRegisterHandler);
 				printf("Process tree for %d created\n", nextNode->val);
-				sem_destroy(childRegisterHandler);
-				if (nextNode->signal!=-1 && curNode->val==1) {
+//				sem_destroy(childRegisterHandler);
+//				if (nextNode->signal!=-1 && curNode->val==1) {
 //					printf("NexNode %d\n", nextNode->val);
 //					printf("CurNode %d\n", curNode->val);
+//					printf("Killing %d\n", nextNode->val);
 //					kill(pid, SIGUSR2);
-				}
+//					printf("Killed %d\n", nextNode->val);
+//				}
+//				printf("Before continue\n");
 				continue;
 			}
 		}
@@ -153,15 +237,18 @@ void createProcessTree(Node *root) {
 
 	// TODO: wait for all child processes check
 //	while (1){};
-	while (wait(NULL)!=-1);
-	printf("Finished %d\n", curNode->val);
+//	while (wait(NULL)!=-1);
+//	printf("Finished %d\n", curNode->val);
 }
 #pragma clang diagnostic pop
 
 int main() {
-	Node *root = createNode(0, NULL, -1);
+	Node *root = createNode(0, NULL, 0, 0);
+	registerSignalHandler(root);
 	createTree(root);
 	createProcessTree(root);
 
+//	kill(-getpid(), SIGUSR2);
+	while (wait(NULL)!=-1);
 	return 0;
 }
