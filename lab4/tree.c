@@ -30,7 +30,7 @@ Node *curNode = NULL;
 int usr1_count_rec = 0;
 int usr2_count_rec = 0;
 
-void sendUsr2ToAllFromNode1();
+void sendToAll(int signal);
 int getPid(int val);
 void signalHandler(int sig, siginfo_t *siginfo, void *code) {
 	printf("%d(%d) received signal %d from %d\n", getpid(), curNode->val, sig, siginfo->si_pid);
@@ -46,14 +46,14 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code) {
 	printf("USR1 count: %d\n", usr1_count_rec);
 	printf("USR2 count: %d\n", usr2_count_rec);
 	if (curNode->val==1 && usr1_count_rec==101) {
-		__pid_t pgid = getpgid(getpid());
-		kill(pgid, SIGTERM);
+		sendToAll(SIGTERM);
+//		sleep(10000);
 		while (wait(NULL)!=-1);
 		exit(0);
 	}
 
 	if (curNode->val==1) {
-		sendUsr2ToAllFromNode1();
+		sendToAll(SIGUSR2);
 	} else {
 		for (int i = 0; i < CHILD_COUNT; ++i) {
 			if (curNode->cn[i]!=NULL) {
@@ -64,19 +64,25 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code) {
 	}
 }
 
-void printSignalSent(int fromPid, int fromVal, int toPid) {
-	printf("Signal sent from %d(%d) to %d\n", fromPid, fromVal, toPid);
+void signalHandlerTerm(int sig, siginfo_t *siginfo, void *code) {
+	printf("%d(%d) received signal %d from %d\n", getpid(), curNode->val, sig, siginfo->si_pid);
 }
 
-void sendUsr2ToAllFromNode1() {
+void printSignalSent(int fromPid, int fromVal, int toPid, int signal) {
+	printf("Signal sent from %d(%d) to %d, signal: %d\n", fromPid, fromVal, toPid, signal);
+}
+
+void sendToAll(int signal) {
 	__pid_t pgid = getpgid(getpid());
-	printSignalSent(getpid(), curNode->val, (-1)*pgid);
-	kill((-1)*pgid, SIGUSR2);
+	printSignalSent(getpid(), curNode->val, (-1)*pgid, signal);
+	if (kill((-1)*pgid, signal))
+		perror("Can't send signal");
 }
 
 Node *createNode(int val, Node *parent, int signal, int signal2) {
 	Node *n = (Node *)malloc(sizeof(Node));
 	n->signal = signal;
+	n->signal2 = signal2;
 	n->val = val;
 	n->sigset = (sigset_t *)malloc(sizeof(sigset_t));
 	for (int i = 0; i < CHILD_COUNT; ++i) {
@@ -154,11 +160,15 @@ void registerSignalHandler(Node *n) {
 	}
 
 	struct sigaction act;
+	memset(&act, 0, sizeof(act));
 	act.sa_sigaction = signalHandler;
 	act.sa_mask = *(n->sigset);
 	act.sa_flags = SA_SIGINFO;
+	if (n->signal && sigaction(n->signal, &act, 0)) {
+		perror("Error: registering signal handler");
+	}
 
-	if (sigaction(n->signal, &act, 0)) {
+	if (n->signal2 && sigaction(n->signal2, &act, 0)) {
 		perror("Error: registering signal handler");
 	}
 }
@@ -210,7 +220,7 @@ void createProcessTree(Node *root) {
 				sem_post(childRegisterHandler);
 				printf("Curnode.val: %d\n", curNode->val);
 				if (curNode->val==1) {
-					sendUsr2ToAllFromNode1();
+					sendToAll(SIGUSR2);
 				}
 				while (1) { sleep(20000); }
 //				while (1){};
