@@ -29,6 +29,8 @@ typedef struct Node {
 Node *curNode = NULL;
 int usr1_count_rec = 0;
 int usr2_count_rec = 0;
+int usr1_count_snd = 0;
+int usr2_count_snd = 0;
 
 long long getTime() {
 	struct timeval tv;
@@ -44,14 +46,12 @@ long long getTime() {
 void sendToAll(int signal);
 int getPid(int val);
 int getValByPid(int pid) {
-	int val = 0;
-	int curPid = -1;
 	for (int i = 0; i < CHILD_COUNT; ++i) {
 		if (getPid(i)==pid) {
 			return i;
 		}
 	}
-
+	return -1;
 };
 void printSignalSent(int fromPid, int fromVal, int toPid, int signal, int toVal) {
 	printf("[%lld]  Signal sent from %d(%d) to %d(%d), signal: %d\n", getTime(), fromPid, fromVal, toPid, toVal, signal);
@@ -65,6 +65,12 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code) {
 	} else if (sig==SIGUSR2) {
 		usr2_count_rec++;
 	} else if (sig==SIGTERM) {
+		printf("[%lld]  %d(%d) received SIGTERM after sent: USR1: %d; USR2: %d;\n",
+		       getTime(),
+		       getpid(),
+		       curNode->val,
+		       usr1_count_snd,
+		       usr2_count_snd);
 		exit(0);
 	}
 //	printf("USR1 count: %d\n", usr1_count_rec);
@@ -77,6 +83,7 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code) {
 	}
 
 	if (curNode->val==1) {
+		usr2_count_snd++;
 		sendToAll(SIGUSR2);
 	} else {
 		for (int i = 0; i < CHILD_COUNT; ++i) {
@@ -85,6 +92,7 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code) {
 				int toVal = curNode->cn[i]->val;
 				int toPid = getPid(toVal);
 				printSignalSent(getpid(), curNode->val, toPid, SIGUSR1, toVal);
+				usr2_count_snd++;
 				kill(toPid, SIGUSR1);
 			}
 		}
