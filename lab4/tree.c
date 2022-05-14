@@ -93,7 +93,8 @@ void signalHandler(int sig, siginfo_t *siginfo, void *code) {
 				int toPid = getPid(toVal);
 				printSignalSent(getpid(), curNode->val, toPid, SIGUSR1, toVal);
 				usr2_count_snd++;
-				kill(toPid, SIGUSR1);
+				if(kill(toPid, SIGUSR1))
+					perror("Can't kill");
 			}
 		}
 	}
